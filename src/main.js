@@ -58,10 +58,11 @@ checkButton.addEventListener('click', async () => {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, input: 'Reply with OK.', store: false, max_output_tokens: 16 }),
+      body: JSON.stringify({ model, input: 'Reply with OK.', store: false, reasoning: { effort: 'low' }, max_output_tokens: 100 }),
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw Object.assign(new Error(explainError(response.status, data.error?.message)), { status: response.status })
+    if (data.status === 'incomplete') throw new Error('응답이 출력 한도에 도달해 완료되지 않았어요. 다시 확인해 주세요.')
     setState('요청 성공', 'success')
     result.innerHTML = '<span class="result-index">API CONNECTION</span><h2>연결이 확인됐어요.</h2><p>Responses API 요청이 정상적으로 완료됐습니다. 감정을 골라 응원 메시지를 받아보세요.</p>'
   } catch (error) {
@@ -125,10 +126,14 @@ sendButton.addEventListener('click', async () => {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, input, store: false, max_output_tokens: 180, safety_identifier: 'color-study-browser' }),
+      body: JSON.stringify({ model, input, store: false, reasoning: { effort: 'low' }, max_output_tokens: 500 }),
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw Object.assign(new Error(explainError(response.status, data.error?.message)), { status: response.status })
+    if (data.status === 'incomplete') {
+      const reason = data.incomplete_details?.reason
+      throw new Error(reason === 'max_output_tokens' ? '응답이 출력 한도에 도달해 완료되지 않았어요. 다시 눌러 주세요.' : '응답이 완료되지 않았어요. 잠시 후 다시 시도해 주세요.')
+    }
 
     setState('요청 성공', 'success')
     const message = (data.output || []).flatMap((item) => item.content || []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n').trim()
